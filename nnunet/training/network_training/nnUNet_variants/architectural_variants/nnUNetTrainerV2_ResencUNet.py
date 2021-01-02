@@ -56,12 +56,15 @@ class nnUNetTrainerV2_ResencUNet(nnUNetTrainerV2):
                  save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
                  force_separate_z: bool = None, interpolation_order: int = 3, interpolation_order_z=0,
-                 segmentation_export_kwargs: dict = None):
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
         ds = self.network.decoder.deep_supervision
         self.network.decoder.deep_supervision = False
-        ret = nnUNetTrainer.validate(self, do_mirroring, use_sliding_window, step_size, save_softmax, use_gaussian,
-                                     overwrite, validation_folder_name, debug, all_in_gpu,
-                                     segmentation_export_kwargs)
+        ret = nnUNetTrainer.validate(self, do_mirroring=do_mirroring, use_sliding_window=use_sliding_window,
+                                     step_size=step_size, save_softmax=save_softmax, use_gaussian=use_gaussian,
+                                     overwrite=overwrite, validation_folder_name=validation_folder_name,
+                                     debug=debug, all_in_gpu=all_in_gpu,
+                                     segmentation_export_kwargs=segmentation_export_kwargs,
+                                     run_postprocessing_on_folds=run_postprocessing_on_folds)
         self.network.decoder.deep_supervision = ds
         return ret
 
@@ -69,14 +72,19 @@ class nnUNetTrainerV2_ResencUNet(nnUNetTrainerV2):
                                                          mirror_axes: Tuple[int] = None,
                                                          use_sliding_window: bool = True, step_size: float = 0.5,
                                                          use_gaussian: bool = True, pad_border_mode: str = 'constant',
-                                                         pad_kwargs: dict = None, all_in_gpu: bool = True,
+                                                         pad_kwargs: dict = None, all_in_gpu: bool = False,
                                                          verbose: bool = True, mixed_precision=True) -> Tuple[np.ndarray, np.ndarray]:
         ds = self.network.decoder.deep_supervision
         self.network.decoder.deep_supervision = False
-        ret = nnUNetTrainer.predict_preprocessed_data_return_seg_and_softmax(self, data, do_mirroring, mirror_axes,
-                                                                             use_sliding_window, step_size,
-                                                                             use_gaussian, pad_border_mode, pad_kwargs,
-                                                                             all_in_gpu, verbose,
+        ret = nnUNetTrainer.predict_preprocessed_data_return_seg_and_softmax(self, data, do_mirroring=do_mirroring,
+                                                                             mirror_axes=mirror_axes,
+                                                                             use_sliding_window=use_sliding_window,
+                                                                             step_size=step_size,
+                                                                             use_gaussian=use_gaussian,
+                                                                             pad_border_mode=pad_border_mode,
+                                                                             pad_kwargs=pad_kwargs,
+                                                                             all_in_gpu=all_in_gpu,
+                                                                             verbose=verbose,
                                                                              mixed_precision=mixed_precision)
         self.network.decoder.deep_supervision = ds
         return ret

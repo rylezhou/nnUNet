@@ -21,9 +21,12 @@ class nnUNetTrainerV2_resample33(nnUNetTrainerV2):
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True,
                  step_size: float = 0.5, save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
-                 segmentation_export_kwargs: dict = None):
-        return super().validate(do_mirroring, use_sliding_window, step_size, save_softmax, use_gaussian,
-                               overwrite, validation_folder_name, debug, all_in_gpu, segmentation_export_kwargs)
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
+        return super().validate(do_mirroring=do_mirroring, use_sliding_window=use_sliding_window, step_size=step_size,
+                                save_softmax=save_softmax, use_gaussian=use_gaussian, overwrite=overwrite,
+                                validation_folder_name=validation_folder_name, debug=debug, all_in_gpu=all_in_gpu,
+                                segmentation_export_kwargs=segmentation_export_kwargs,
+                                run_postprocessing_on_folds=run_postprocessing_on_folds)
 
     def preprocess_predict_nifti(self, input_files, output_file=None, softmax_ouput_file=None,
                                  mixed_precision: bool = True):
@@ -38,10 +41,12 @@ class nnUNetTrainerV2_resample33(nnUNetTrainerV2):
         print("preprocessing...")
         d, s, properties = self.preprocess_patient(input_files)
         print("predicting...")
-        pred = self.predict_preprocessed_data_return_seg_and_softmax(d, self.data_aug_params["do_mirror"],
-                                                                     self.data_aug_params['mirror_axes'], True, 0.5,
-                                                                     True, 'constant', {'constant_values': 0},
-                                                                     self.patch_size, True,
+        pred = self.predict_preprocessed_data_return_seg_and_softmax(d, do_mirroring=self.data_aug_params["do_mirror"],
+                                                                     mirror_axes=self.data_aug_params['mirror_axes'],
+                                                                     use_sliding_window=True, step_size=0.5,
+                                                                     use_gaussian=True, pad_border_mode='constant',
+                                                                     pad_kwargs={'constant_values': 0},
+                                                                     all_in_gpu=True,
                                                                      mixed_precision=mixed_precision)[1]
         pred = pred.transpose([0] + [i + 1 for i in self.transpose_backward])
 

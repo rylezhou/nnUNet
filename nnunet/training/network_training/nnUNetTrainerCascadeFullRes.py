@@ -153,7 +153,7 @@ class nnUNetTrainerCascadeFullRes(nnUNetTrainer):
                  step_size: float = 0.5,
                  save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
-                 segmentation_export_kwargs: dict = None):
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
 
         current_mode = self.network.training
         self.network.eval()
@@ -204,9 +204,12 @@ class nnUNetTrainerCascadeFullRes(nnUNetTrainer):
             data[-1][data[-1] == -1] = 0
             data_for_net = np.concatenate((data[:-1], to_one_hot(seg_from_prev_stage[0], range(1, self.num_classes))))
 
-            softmax_pred = self.predict_preprocessed_data_return_seg_and_softmax(data_for_net, do_mirroring,
-                                                                                 mirror_axes, use_sliding_window,
-                                                                                 step_size, use_gaussian,
+            softmax_pred = self.predict_preprocessed_data_return_seg_and_softmax(data_for_net,
+                                                                                 do_mirroring=do_mirroring,
+                                                                                 mirror_axes=mirror_axes,
+                                                                                 use_sliding_window=use_sliding_window,
+                                                                                 step_size=step_size,
+                                                                                 use_gaussian=use_gaussian,
                                                                                  all_in_gpu=all_in_gpu,
                                                                                  mixed_precision=self.fp16)[1]
 
@@ -254,15 +257,16 @@ class nnUNetTrainerCascadeFullRes(nnUNetTrainer):
                              json_author="Fabian", json_description="",
                              json_task=task)
 
-        # in the old nnunet we would stop here. Now we add a postprocessing. This postprocessing can remove everything
-        # except the largest connected component for each class. To see if this improves results, we do this for all
-        # classes and then rerun the evaluation. Those classes for which this resulted in an improved dice score will
-        # have this applied during inference as well
-        self.print_to_log_file("determining postprocessing")
-        determine_postprocessing(self.output_folder, self.gt_niftis_folder, validation_folder_name,
-                                 final_subf_name=validation_folder_name + "_postprocessed", debug=debug)
-        # after this the final predictions for the vlaidation set can be found in validation_folder_name_base + "_postprocessed"
-        # They are always in that folder, even if no postprocessing as applied!
+        if run_postprocessing_on_folds:
+            # in the old nnunet we would stop here. Now we add a postprocessing. This postprocessing can remove everything
+            # except the largest connected component for each class. To see if this improves results, we do this for all
+            # classes and then rerun the evaluation. Those classes for which this resulted in an improved dice score will
+            # have this applied during inference as well
+            self.print_to_log_file("determining postprocessing")
+            determine_postprocessing(self.output_folder, self.gt_niftis_folder, validation_folder_name,
+                                     final_subf_name=validation_folder_name + "_postprocessed", debug=debug)
+            # after this the final predictions for the vlaidation set can be found in validation_folder_name_base + "_postprocessed"
+            # They are always in that folder, even if no postprocessing as applied!
 
         # detemining postprocesing on a per-fold basis may be OK for this fold but what if another fold finds another
         # postprocesing to be better? In this case we need to consolidate. At the time the consolidation is going to be

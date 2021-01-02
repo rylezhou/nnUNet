@@ -182,6 +182,14 @@ def get_available_models():
                            "Also see http://celltrackingchallenge.net/",
             'url': "https://zenodo.org/record/4003545/files/Task089_Fluo-N2DH-SIM_thickborder_time.zip?download=1"
         },
+        "Task114_heart_MNMs": {
+            'description':  "Cardiac MRI short axis images from the M&Ms challenge 2020.\n"
+                            "input modalities are 0: MRI \n"
+                            "See also https://www.ub.edu/mnms/ \n"
+                            "Note: Labels of the M&Ms Challenge are not in the same order as for the ACDC challenge. \n"
+                            "See https://github.com/MIC-DKFZ/nnUNet/blob/master/nnunet/dataset_conversion/Task114_heart_mnms.py",
+            'url': "https://zenodo.org/record/4288464/files/Task114_heart_MNMs.zip?download=1"
+        },
 
     }
     return available_models

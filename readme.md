@@ -1,3 +1,10 @@
+**[2020_10_21] Update:** We now have documentation for [common questions](documentation/common_questions.md) and
+[common issues](documentation/common_problems_and_solutions.md). We now also provide [reference epoch times for 
+several datasets and tips on how to identify bottlenecks](documentation/expected_epoch_times.md).
+
+Please read these documents before opening a new issue!
+
+
 # nnU-Net
 
 In 3D biomedical image segmentation, dataset properties like imaging modality, image sizes, voxel spacings, class 
@@ -55,35 +62,41 @@ Please also cite this paper if you are using nnU-Net for your research!
         * [3D low resolution U-Net](#3d-low-resolution-u-net)
         * [3D full resolution U-Net](#3d-full-resolution-u-net-1)
       - [Multi GPU training](#multi-gpu-training)
-    + [Identifying the best U-Net configuration(s)](#identifying-the-best-u-net-configuration)
+    + [Identifying the best U-Net configuration](#identifying-the-best-u-net-configuration)
     + [Run inference](#run-inference)
   * [How to run inference with pretrained models](#how-to-run-inference-with-pretrained-models)
-  * [Examples](#Examples)
+  * [Examples](#examples)
 - [Extending/Changing nnU-Net](#extending-changing-nnu-net)
-- [FAQ](#faq)
+- [Information on run time and potential performance bottlenecks.](#information-on-run-time-and-potential-performance-bottlenecks)
+- [Common questions and issues](#common-questions-and-issues)
 
-ecotrust-canada.github.io/markdown-toc/
 
 # Installation
-nnU-Net is only tested on Linux (Ubuntu 16, 18 and 20; centOS, RHEL). It may work on other operating systems as well 
-but we do not guarantee that it will.
+nnU-Net has been tested on Linux (Ubuntu 16, 18 and 20; centOS, RHEL). We do not provide support for other operating 
+systems.
 
 nnU-Net requires a GPU! For inference, the GPU should have 4 GB of VRAM. For training nnU-Net models the GPU should have at 
-least 11 GB (such as the RTX 2080ti). Due to the use of mixed precision, fastest training times are achieved with the 
-Volta architecture (Titan V, V100 GPUs) or when compiling pytorch from source 
-(see [here](https://github.com/pytorch/pytorch#from-source)) using cuDNN 8.0.2. Note that future versions of pytorch 
-will include cuDNN 8.0.2 or newer by default and compiling from source will not be necessary.
+least 10 GB (popular non-datacenter options are the RTX 2080ti, RTX 3080 or RTX 3090). Due to the use of automated mixed 
+precision, fastest training times are achieved with the Volta architecture (Titan V, V100 GPUs) when installing pytorch 
+the easy way. Since pytorch comes with cuDNN 7.6.5 and tensor core acceleration on Turing GPUs is not supported for 3D 
+convolutions in this version, you will not get the best training speeds on Turing GPUs. You can remedy that by compiling pytorch from source 
+(see [here](https://github.com/pytorch/pytorch#from-source)) using cuDNN 8.0.2 or newer. This will unlock Turing GPUs 
+(RTX 2080ti, RTX 6000) for automated mixed precision training with 3D convolutions and make the training blistering 
+fast as well. Note that future versions of pytorch may include cuDNN 8.0.2 or newer by default and 
+compiling from source will not be necessary.
+We don't know the speed of Ampere GPUs with vanilla vs self-compiled pytorch yet - this section will be updated as 
+soon as we know.
 
-For training, we recommend a strong CPU top go along with the GPU. At least 6 CPU cores (12 threads) are recommended. CPU 
-requirements are mostly related to data augmentation and scale with the number of input channels and are thus higher 
-for datasets like BraTS which use 4 image 
-modalities and lower for datasets like LiTS which only uses CT images.
+For training, we recommend a strong CPU to go along with the GPU. At least 6 CPU cores (12 threads) are recommended. CPU 
+requirements are mostly related to data augmentation and scale with the number of input channels. They are thus higher 
+for datasets like BraTS which use 4 image modalities and lower for datasets like LiTS which only uses CT images.
 
 We very strongly recommend you install nnU-Net in a virtual environment. 
-[Here is a quick how-to for Ubuntu.](https://linoxide.com/linux-how-to/setup-python-virtual-environment-ubuntu/).
-Please do not use conda environments. This has caused multiple issues in the past.
+[Here is a quick how-to for Ubuntu.](https://linoxide.com/linux-how-to/setup-python-virtual-environment-ubuntu/)
+If you choose to compile pytorch from source, you will need to use conda instead of pip. In that case, please set the 
+environment variable OMP_NUM_THREADS=1 (preferably in your bashrc using `export OMP_NUM_THREADS=1`). This is important!
 
-Python 2 is deprecated and not supported. Please make sure you are using Python 3 :-)
+Python 2 is deprecated and not supported. Please make sure you are using Python 3.
 
 1) Install [PyTorch](https://pytorch.org/get-started/locally/). You need at least version 1.6
 2) Install nnU-Net depending on your use case:
@@ -182,40 +195,53 @@ cascade is omitted because the patch size of the full resolution U-Net already c
 
 Training models is done with the `nnUNet_train` command. The general structure of the command is:
 ```bash
-nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD (additional options)
+nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD  --npz (additional options)
 ```
 
 CONFIGURATION is a string that identifies the requested U-Net configuration. TRAINER_CLASS_NAME is the name of the 
 model trainer. If you implement custom trainers (nnU-Net as a framework) you can specify your custom trainer here.
-TASK_NAME_OR_ID specifies what dataset should be trained on and FOLD specifies which fold of the 5-fold-crossvalidaton is trained.
+TASK_NAME_OR_ID specifies what dataset should be trained on and FOLD specifies which fold of the 5-fold-cross-validaton 
+is trained.
 
 nnU-Net stores a checkpoint every 50 epochs. If you need to continue a previous training, just add a `-c` to the 
 training command.
 
- 
+IMPORTANT: `--npz` makes the models save the softmax outputs during the final validation. It should only be used for trainings 
+where you plan to run `nnUNet_find_best_configuration` afterwards 
+(this is nnU-Nets automated selection of the best performing (ensemble of) configuration(s), see below). If you are developing new 
+trainer classes you may not need the softmax predictions and should therefore omit the `--npz` flag. Exported softmax 
+predictions are very large and therefore can take up a lot of disk space.
+If you ran initially without the `--npz` flag but now require the softmax predictions, simply run 
+```bash
+nnUNet_train CONFIGURATION TRAINER_CLASS_NAME TASK_NAME_OR_ID FOLD -val --npz
+```
+to generate them. This will only rerun the validation, not the training.
+
+See `nnUNet_train -h` for additional options.
+
 #### 2D U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 2d nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 2d nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 #### 3D full resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_fullres nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 3d_fullres nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 #### 3D U-Net cascade
 ##### 3D low resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_lowres nnUNetTrainerV2 TaskXXX_MYTASK FOLD
+nnUNet_train 3d_lowres nnUNetTrainerV2 TaskXXX_MYTASK FOLD --npz
 ```
 
 ##### 3D full resolution U-Net
 For FOLD in [0, 1, 2, 3, 4], run:
 ```bash
-nnUNet_train 3d_cascade_fullres nnUNetTrainerV2CascadeFullRes TaskXXX_MYTASK FOLD
+nnUNet_train 3d_cascade_fullres nnUNetTrainerV2CascadeFullRes TaskXXX_MYTASK FOLD --npz
 ```
 
 Note that the 3D full resolution U-Net of the cascade requires the five folds of the low resolution U-Net to be 
@@ -426,82 +452,15 @@ Usability not good enough? Let us know!
 # Extending/Changing nnU-Net
 Please refer to [this](documentation/extending_nnunet.md) guide.
 
-# FAQ
-#### Manual Splitting of Data
-The cross-validation in nnU-Net splits on a per-case basis. This may sometimes not be desired, for example because 
-several training cases may be the same patient (different time steps or annotators). If this is the case, then you need to
-manually create a split file. To do this, first let nnU-Net create the default split file. Run one of the network 
-trainings (any of them works fine for this) and abort after the first epoch. nnU-Net will have created a split file automatically:
-`preprocessing_output_dir/TaskXX_MY_DATASET/splits_final.pkl`. This file contains a list (length 5, one entry per fold). 
-Each entry in the list is a dictionary with keys 'train' and 'val' pointing to the patientIDs assigned to the sets. 
-To use your own splits in nnU-Net, you need to edit these entries to what you want them to be and save it back to the 
-splits_final.pkl file. Use load_pickle and save_pickle from batchgenerators.utilities.file_and_folder_operations for convenience.
+# Information on run time and potential performance bottlenecks.
 
-#### Do I need to always run all U-Net configurations?
-The model training pipeline above is for challenge participations. Depending on your task you may not want to train all 
-U-Net models and you may also not want to run a cross-validation all the time.
-Here are some recommendations about what U-Net model to train:
-- It is safe to say that on average, the 3D U-Net model (3d_fullres) was most robust. If you just want to use nnU-Net because you 
-need segmentations, I recommend you start with this.
-- If you are not happy with the results from the 3D U-Net then you can try the following:
-  - if your cases are very large so that the patch size of the 3d U-Net only covers a very small fraction of an image then 
-  it is possible that the 3d U-Net cannot capture sufficient contextual information in order to be effective. If this 
-  is the case, you should consider running the 3d U-Net cascade (3d_lowres followed by 3d_cascade_fullres)
-  - If your data is very anisotropic then a 2D U-Net may actually be a better choice (Promise12, ACDC, Task05_Prostate 
-  from the decathlon are examples for anisotropic data)
+We have compiled a list of expected epoch times on standardized datasets across many different GPUs. You can use them 
+to verify that your system is performing as expected. There are also tips on how to identify bottlenecks and what 
+to do about them.
 
-You do not have to run five-fold cross-validation all the time. If you want to test single model performance, use
- *all* for `FOLD` instead of a number. Note that this will then not give you an estimate of your performance on the 
- training set. You will also no tbe able to automatically identify which ensembling should be used and nnU-Net will 
- not be able to configure a postprocessing. 
- 
-CAREFUL: DO NOT use fold=all when you intend to run the cascade! You must run the cross-validation in 3d_lowres so 
-that you get proper (=not overfitted) low resolution predictions.
- 
-#### Sharing Models
-You can share trained models by simply sending the corresponding output folder from `RESULTS_FOLDER/nnUNet` to 
-whoever you want share them with. The recipient can then use nnU-Net for inference with this model.
+Click [here](documentation/expected_epoch_times.md).
 
-#### Can I run nnU-Net on smaller GPUs?
-nnU-Net is guaranteed to run on GPUs with 11GB of memory. Many configurations may also run on 8 GB. If you wish to 
-configure nnU-Net to use a different amount of GPU memory, simply adapt the reference value for the GPU memory estimation 
-accordingly (with some slack because the whole thing is not an exact science!). For example, in 
-[experiment_planner_baseline_3DUNet_v21_11GB.py](nnunet/experiment_planning/experiment_planner_baseline_3DUNet_v21_11GB.py) 
-we provide an example that attempts to maximise the usage of GPU memory on 11GB as opposed to the default which leaves 
-much more headroom). This is simply achieved by this line:
+# Common questions and issues
 
-```python
-ref = Generic_UNet.use_this_for_batch_size_computation_3D * 11 / 8
-```
-
-with 8 being what is currently used (approximately) and 11 being the target. Should you get CUDA out of memory 
-issues, simply reduce the reference value. You should do this adaptation as part of a separate ExperimentPlanner class. 
-Please read the instructions [here](documentation/extending_nnunet.md).
-
-A 32 GB variant is also provided (ExperimentPlanner3D_v21_32GB). Note that increasing the GPU memory target while 
-remaining on the same GPU will increase the computation time during training and thus the run time substantially! 
-
-#### I get the error `seg from prev stage missing` when running the cascade
-You need to run all five folds of `3d_lowres`. Segmentations of the previous stage can only be generated from the 
-validation set, otherwise we would overfit.
-
-#### Why am I getting `RuntimeError: CUDA error: device-side assert triggered`?
-This error often goes along with something like `void THCudaTensor_scatterFillKernel(TensorInfo<Real, IndexType>, 
-TensorInfo<long, IndexType>, Real, int, IndexType) [with IndexType = unsigned int, Real = float, Dims = -1]: 
-block: [4770,0,0], thread: [374,0,0] Assertion indexValue >= 0 && indexValue < tensor.sizes[dim] failed.`.
-
-This means that your dataset contains unexpected values in the segmentations. nnU-Net expects all labels to be 
-consecutive integers. So if your dataset has 4 classes (background and three foregound labels), then the labels 
-must be 0, 1, 2, 3 (where 0 must be background!). There cannot be any other values in the ground truth segmentations.
-
-If you run `nnUNet_plan_and_preprocess` with the --verify_dataset_integrity option, this should never happen because 
-it will check for wrong values in the label images.
-
-#### Why is no 3d_lowres model created?
-3d_lowres is created only if the patch size in 3d_fullres less than 1/8 of the voxels of the median shape of the data 
-in 3d_fullres (for example Liver is about 512x512x512 and the patch size is 128x128x128, so that's 1/64 and thus 
-3d_lowres is created). You can enforce the creation of 3d_lowres models for smaller datasets by changing the value of
-`HOW_MUCH_OF_A_PATIENT_MUST_THE_NETWORK_SEE_AT_STAGE0` (located in experiment_planning.configuration).
-    
-#### Error: mmap length is greater than file size
-Please delete all .npy files in the nnUNet_preprocessed folder of the test you were trying to train. Then try again.
+We have collected solutions to common [questions](documentation/common_questions.md) and 
+[problems](documentation/common_problems_and_solutions.md). Please consult these documents before you open a new issue.

@@ -108,7 +108,8 @@ class nnUNetTrainerV2(nnUNetTrainer):
                         'patch_size_for_spatialtransform'],
                     self.data_aug_params,
                     deep_supervision_scales=self.deep_supervision_scales,
-                    pin_memory=self.pin_memory
+                    pin_memory=self.pin_memory,
+                    use_FasterMultiThreadedAugmenter=False
                 )
                 self.print_to_log_file("TRAINING KEYS:\n %s" % (str(self.dataset_tr.keys())),
                                        also_print_to_console=False)
@@ -181,14 +182,17 @@ class nnUNetTrainerV2(nnUNetTrainer):
     def validate(self, do_mirroring: bool = True, use_sliding_window: bool = True,
                  step_size: float = 0.5, save_softmax: bool = True, use_gaussian: bool = True, overwrite: bool = True,
                  validation_folder_name: str = 'validation_raw', debug: bool = False, all_in_gpu: bool = False,
-                 segmentation_export_kwargs: dict = None):
+                 segmentation_export_kwargs: dict = None, run_postprocessing_on_folds: bool = True):
         """
         We need to wrap this because we need to enforce self.network.do_ds = False for prediction
         """
         ds = self.network.do_ds
         self.network.do_ds = False
-        ret = super().validate(do_mirroring, use_sliding_window, step_size, save_softmax, use_gaussian,
-                               overwrite, validation_folder_name, debug, all_in_gpu, segmentation_export_kwargs)
+        ret = super().validate(do_mirroring=do_mirroring, use_sliding_window=use_sliding_window, step_size=step_size,
+                               save_softmax=save_softmax, use_gaussian=use_gaussian,
+                               overwrite=overwrite, validation_folder_name=validation_folder_name, debug=debug,
+                               all_in_gpu=all_in_gpu, segmentation_export_kwargs=segmentation_export_kwargs,
+                               run_postprocessing_on_folds=run_postprocessing_on_folds)
 
         self.network.do_ds = ds
         return ret
@@ -197,16 +201,21 @@ class nnUNetTrainerV2(nnUNetTrainer):
                                                          mirror_axes: Tuple[int] = None,
                                                          use_sliding_window: bool = True, step_size: float = 0.5,
                                                          use_gaussian: bool = True, pad_border_mode: str = 'constant',
-                                                         pad_kwargs: dict = None, all_in_gpu: bool = True,
+                                                         pad_kwargs: dict = None, all_in_gpu: bool = False,
                                                          verbose: bool = True, mixed_precision=True) -> Tuple[np.ndarray, np.ndarray]:
         """
         We need to wrap this because we need to enforce self.network.do_ds = False for prediction
         """
         ds = self.network.do_ds
         self.network.do_ds = False
-        ret = super().predict_preprocessed_data_return_seg_and_softmax(data, do_mirroring, mirror_axes,
-                                                                       use_sliding_window, step_size, use_gaussian,
-                                                                       pad_border_mode, pad_kwargs, all_in_gpu, verbose,
+        ret = super().predict_preprocessed_data_return_seg_and_softmax(data,
+                                                                       do_mirroring=do_mirroring,
+                                                                       mirror_axes=mirror_axes,
+                                                                       use_sliding_window=use_sliding_window,
+                                                                       step_size=step_size, use_gaussian=use_gaussian,
+                                                                       pad_border_mode=pad_border_mode,
+                                                                       pad_kwargs=pad_kwargs, all_in_gpu=all_in_gpu,
+                                                                       verbose=verbose,
                                                                        mixed_precision=mixed_precision)
         self.network.do_ds = ds
         return ret
@@ -264,9 +273,13 @@ class nnUNetTrainerV2(nnUNetTrainer):
 
     def do_split(self):
         """
-        we now allow more than 5 splits. IMPORTANT: and fold > 4 will not be a real split but just another random
-        80:20 split of the data. You cannot run X-fold cross-validation with this code. It will always be a 5-fold CV.
-        Folds > 4 will be independent from each other
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.pkl file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.pkl file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
         :return:
         """
         if self.fold == "all":
