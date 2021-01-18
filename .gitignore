@@ -82,6 +82,9 @@ celerybeat-schedule
 venv/
 ENV/
 
+# test
+tests/
+
 # Spyder project settings
 .spyderproject
 
@@ -110,6 +113,6 @@ ENV/
 *.png
 *.jpg
 *.jpeg
-
+*.tar
 *.model
 
