@@ -399,8 +399,8 @@ class NetworkTrainer(object):
         self._maybe_init_amp()
 
     def _maybe_init_amp(self):
-        if self.fp16 and self.amp_grad_scaler is None and torch.cuda.is_available():
-                self.amp_grad_scaler = GradScaler()
+        if self.fp16 and self.amp_grad_scaler is None:
+            self.amp_grad_scaler = GradScaler()
 
     def plot_network_architecture(self):
         """
@@ -411,6 +411,9 @@ class NetworkTrainer(object):
         pass
 
     def run_training(self):
+        if not torch.cuda.is_available():
+            self.print_to_log_file("WARNING!!! You are attempting to run training on a CPU (torch.cuda.is_available() is False). This can be VERY slow!")
+
         _ = self.tr_gen.next()
         _ = self.val_gen.next()
 

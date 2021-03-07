@@ -11,17 +11,13 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-import shutil
-import tempfile
+import zipfile
 from time import time
-from urllib.request import urlopen
 
+import requests
 from batchgenerators.utilities.file_and_folder_operations import join, isfile
 
 from nnunet.paths import network_training_output_dir
-from subprocess import call
-import requests
-import os
 
 
 def get_available_models():
@@ -59,7 +55,7 @@ def get_available_models():
                            "Segmentation targets are peripheral and central zone, \n"
                            "input modalities are 0: T2, 1: ADC. \n"
                            "Also see Medical Segmentation Decathlon, http://medicaldecathlon.com/",
-            'url': "https://zenodo.org/record/4003545/files/Task005_Prostate.zip?download=1"
+            'url': "https://zenodo.org/record/4485926/files/Task005_Prostate.zip?download=1"
         },
         "Task006_Lung": {
             'description': "Lung Nodule Segmentation. \n"
@@ -261,7 +257,8 @@ def download_file(url, local_filename):
 
 
 def install_model_from_zip_file(zip_file: str):
-    call(['unzip', '-o', '-d', network_training_output_dir, zip_file])
+    with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+        zip_ref.extractall(network_training_output_dir)
 
 
 def print_license_warning():
