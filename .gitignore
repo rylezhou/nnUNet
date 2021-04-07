@@ -86,6 +86,9 @@ ENV/
 # test
 tests/
 
+# data
+nnUNet*/
+
 # Spyder project settings
 .spyderproject
 
